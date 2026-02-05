@@ -1,16 +1,333 @@
 <!doctype html>
 <html lang="pt-br">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>A Batalha do CLT — Pokémon GBC vibe</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>A Batalha do CLT</title>
+
+  <!-- Phaser -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+
   <style>
-    html, body { margin:0; height:100%; background:#0c0f12; overflow:hidden; }
-    canvas { width:100vw; height:100vh; image-rendering: pixelated; image-rendering: crisp-edges; }
+    :root{
+      --bg:#05070a;
+      --panel:#0b1016;
+      --panel2:#0a0f14;
+      --edge:#8fa6be;
+      --edge2:#cbd6e2;
+      --gold:#ffdf7e;
+      --btn:#1a2430;
+      --btn2:#111923;
+      --shadow: rgba(0,0,0,.55);
+    }
+    *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    html,body{ height:100%; margin:0; background: var(--bg); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
+    body{ overflow:hidden; }
+
+    /* Layout vertical: GAME em cima, CONTROLES embaixo */
+    .app{
+      height:100%;
+      width:100%;
+      display:flex;
+      flex-direction:column;
+      background: radial-gradient(1200px 600px at 50% 0%, #0a111a 0%, var(--bg) 55%, #000 100%);
+    }
+
+    /* TOP: área do canvas */
+    .top{
+      flex: 1 1 auto;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 10px 10px 6px;
+    }
+
+    .gameShell{
+      width:min(96vw, 720px);
+      aspect-ratio: 384 / 216;
+      position:relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      box-shadow: 0 18px 60px rgba(0,0,0,.55);
+      border: 1px solid rgba(203,214,226,.18);
+      overflow:hidden;
+    }
+
+    /* Phaser injecta o canvas. Deixamos ele preencher o shell preservando o aspecto */
+    canvas{
+      width:100% !important;
+      height:100% !important;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      display:block;
+      background:#000;
+    }
+
+    /* BOTTOM: controles */
+    .controls{
+      flex: 0 0 auto;
+      padding: 10px 14px 18px;
+      background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.35) 35%, rgba(0,0,0,.55) 100%);
+    }
+
+    .ctrlPanel{
+      width:min(96vw, 720px);
+      margin:0 auto;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border: 1px solid rgba(203,214,226,.14);
+      box-shadow: 0 18px 60px rgba(0,0,0,.6);
+      padding: 14px 14px 12px;
+    }
+
+    .ctrlRow{
+      display:flex;
+      gap: 14px;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    /* D-PAD */
+    .dpad{
+      width: 168px;
+      height: 168px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      border: 1px solid rgba(203,214,226,.12);
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,.25);
+      position:relative;
+      display:grid;
+      place-items:center;
+      flex: 0 0 auto;
+    }
+    .dpad .cross{
+      width: 112px;
+      height: 112px;
+      position:relative;
+    }
+    .dpadBtn{
+      position:absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, var(--btn), var(--btn2));
+      border: 1px solid rgba(203,214,226,.14);
+      box-shadow: 0 10px 26px rgba(0,0,0,.35), inset 0 0 0 2px rgba(0,0,0,.25);
+      display:grid;
+      place-items:center;
+      color:#dbe7f3;
+      font-size: 14px;
+      user-select:none;
+      touch-action:none;
+    }
+    .dpadBtn:active, .dpadBtn.pressed{
+      transform: translateY(1px);
+      filter: brightness(1.15);
+      box-shadow: 0 6px 16px rgba(0,0,0,.35), inset 0 0 0 2px rgba(0,0,0,.28);
+      border-color: rgba(255,223,126,.55);
+    }
+    .dpadBtn.up{ left:34px; top:0; }
+    .dpadBtn.down{ left:34px; bottom:0; }
+    .dpadBtn.left{ left:0; top:34px; }
+    .dpadBtn.right{ right:0; top:34px; }
+
+    /* A/B */
+    .ab{
+      width: 178px;
+      height: 168px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      border: 1px solid rgba(203,214,226,.12);
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,.25);
+      position:relative;
+      flex: 0 0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap: 14px;
+    }
+    .abBtn{
+      width: 64px;
+      height: 64px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--btn), var(--btn2));
+      border: 1px solid rgba(203,214,226,.14);
+      box-shadow: 0 12px 30px rgba(0,0,0,.4), inset 0 0 0 2px rgba(0,0,0,.25);
+      display:grid;
+      place-items:center;
+      color:#eef3f7;
+      font-weight:700;
+      letter-spacing:.5px;
+      user-select:none;
+      touch-action:none;
+    }
+    .abBtn small{
+      display:block;
+      margin-top:4px;
+      font-weight:400;
+      font-size:10px;
+      color:#bcd0e6;
+      letter-spacing:0;
+    }
+    .abBtn:active, .abBtn.pressed{
+      transform: translateY(1px);
+      filter: brightness(1.15);
+      border-color: rgba(255,223,126,.55);
+    }
+
+    /* Start/Select */
+    .midRow{
+      display:flex;
+      justify-content:center;
+      gap: 14px;
+      margin-top: 10px;
+      opacity: .95;
+    }
+    .miniBtn{
+      width: 86px;
+      height: 28px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(26,36,48,.95), rgba(17,25,35,.95));
+      border: 1px solid rgba(203,214,226,.14);
+      box-shadow: 0 10px 24px rgba(0,0,0,.35), inset 0 0 0 2px rgba(0,0,0,.25);
+      color:#dbe7f3;
+      font-size: 11px;
+      display:grid;
+      place-items:center;
+      user-select:none;
+      touch-action:none;
+    }
+    .miniBtn:active, .miniBtn.pressed{
+      transform: translateY(1px);
+      filter: brightness(1.12);
+      border-color: rgba(255,223,126,.55);
+    }
+
+    .hint{
+      margin-top: 10px;
+      text-align:center;
+      font-size: 11px;
+      color:#bcd0e6;
+      opacity: .9;
+    }
+    .hint b{ color: var(--gold); font-weight:700; }
+
+    @media (max-width: 420px){
+      .dpad{ width:150px; height:150px; }
+      .ab{ width:164px; height:150px; }
+      .abBtn{ width:58px; height:58px; }
+      .dpad .cross{ width:104px; height:104px; }
+      .dpadBtn{ width:42px; height:42px; }
+    }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 </head>
+
 <body>
+  <div class="app">
+    <div class="top">
+      <div class="gameShell" id="game-shell">
+        <!-- Phaser injecta o canvas aqui -->
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="ctrlPanel">
+
+        <div class="ctrlRow">
+          <!-- D-PAD -->
+          <div class="dpad">
+            <div class="cross">
+              <div class="dpadBtn up"    data-vkey="up">▲</div>
+              <div class="dpadBtn left"  data-vkey="left">◀</div>
+              <div class="dpadBtn right" data-vkey="right">▶</div>
+              <div class="dpadBtn down"  data-vkey="down">▼</div>
+            </div>
+          </div>
+
+          <!-- A/B -->
+          <div class="ab">
+            <div class="abBtn" data-vkey="b">B<small>Voltar</small></div>
+            <div class="abBtn" data-vkey="a">A<small>OK</small></div>
+          </div>
+        </div>
+
+        <div class="midRow">
+          <div class="miniBtn" data-vkey="select">SELECT</div>
+          <div class="miniBtn" data-vkey="start">START</div>
+        </div>
+
+        <div class="hint">
+          <b>A</b>=ENTER • <b>B</b>=ESC • D-Pad=Setas • START=ENTER • SELECT=STATUS
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Virtual Pad (estado global lido pelo game.js)
+    window.VirtualPad = {
+      up:false, down:false, left:false, right:false,
+      a:false, b:false, start:false, select:false
+    };
+
+    function setPad(key, on){
+      window.VirtualPad[key] = on;
+      const el = document.querySelector(`[data-vkey="${key}"]`);
+      if (el) el.classList.toggle("pressed", on);
+    }
+
+    function bindPress(el, key){
+      const down = (ev)=>{ ev.preventDefault(); setPad(key,true); };
+      const up   = (ev)=>{ ev.preventDefault(); setPad(key,false); };
+
+      el.addEventListener("pointerdown", down);
+      el.addEventListener("pointerup", up);
+      el.addEventListener("pointercancel", up);
+      el.addEventListener("pointerleave", up);
+
+      // fallback mouse
+      el.addEventListener("mousedown", down);
+      window.addEventListener("mouseup", up);
+
+      // touch fallback
+      el.addEventListener("touchstart", down, {passive:false});
+      el.addEventListener("touchend", up, {passive:false});
+      el.addEventListener("touchcancel", up, {passive:false});
+    }
+
+    // ligar todos os botões
+    document.querySelectorAll("[data-vkey]").forEach(el=>{
+      bindPress(el, el.getAttribute("data-vkey"));
+    });
+
+    // permitir teclado normal também (sincroniza o visual do pad)
+    window.addEventListener("keydown", (e)=>{
+      if (e.repeat) return;
+      if (e.key === "ArrowUp") setPad("up", true);
+      if (e.key === "ArrowDown") setPad("down", true);
+      if (e.key === "ArrowLeft") setPad("left", true);
+      if (e.key === "ArrowRight") setPad("right", true);
+      if (e.key === "Enter") setPad("a", true);
+      if (e.key === "Escape") setPad("b", true);
+      if (e.key.toLowerCase() === "s") setPad("start", true);
+      if (e.key.toLowerCase() === "x") setPad("select", true);
+    });
+
+    window.addEventListener("keyup", (e)=>{
+      if (e.key === "ArrowUp") setPad("up", false);
+      if (e.key === "ArrowDown") setPad("down", false);
+      if (e.key === "ArrowLeft") setPad("left", false);
+      if (e.key === "ArrowRight") setPad("right", false);
+      if (e.key === "Enter") setPad("a", false);
+      if (e.key === "Escape") setPad("b", false);
+      if (e.key.toLowerCase() === "s") setPad("start", false);
+      if (e.key.toLowerCase() === "x") setPad("select", false);
+    });
+  </script>
+
   <script src="./game.js"></script>
 </body>
 </html>
